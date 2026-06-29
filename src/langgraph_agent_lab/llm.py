@@ -12,8 +12,6 @@ Usage in nodes:
 from __future__ import annotations
 
 import os
-
-
 from typing import Any
 
 
@@ -36,7 +34,9 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
     """
     if os.getenv("GEMINI_API_KEY"):
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore[import-untyped, import-not-found]
+            from langchain_google_genai import (
+                ChatGoogleGenerativeAI,  # type: ignore[import-untyped, import-not-found]
+            )
         except ImportError as exc:
             raise RuntimeError("Install: pip install langchain-google-genai") from exc
         return ChatGoogleGenerativeAI(
@@ -61,7 +61,9 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
 
     if os.getenv("ANTHROPIC_API_KEY"):
         try:
-            from langchain_anthropic import ChatAnthropic  # type: ignore[import-untyped, import-not-found]
+            from langchain_anthropic import (
+                ChatAnthropic,  # type: ignore[import-untyped, import-not-found]
+            )
         except ImportError as exc:
             raise RuntimeError("Install: pip install langchain-anthropic") from exc
         return ChatAnthropic(
