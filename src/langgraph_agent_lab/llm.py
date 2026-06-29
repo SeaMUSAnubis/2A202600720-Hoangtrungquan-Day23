@@ -16,6 +16,14 @@ import os
 
 from typing import Any
 
+
+def _llm_timeout_seconds() -> float:
+    return float(os.getenv("LLM_TIMEOUT_SECONDS", "10"))
+
+
+def _llm_max_retries() -> int:
+    return int(os.getenv("LLM_MAX_RETRIES", "0"))
+
 def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
     """Create an LLM client from environment configuration.
 
@@ -35,6 +43,8 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
             model=str(model or os.getenv("LLM_MODEL", "gemini-2.5-flash")),
             google_api_key=os.getenv("GEMINI_API_KEY"),
             temperature=temperature,
+            timeout=_llm_timeout_seconds(),
+            max_retries=_llm_max_retries(),
         )
 
     if os.getenv("OPENAI_API_KEY"):
@@ -45,6 +55,8 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
         return ChatOpenAI(
             model=str(model or os.getenv("LLM_MODEL", "gpt-4o-mini")),
             temperature=temperature,
+            timeout=_llm_timeout_seconds(),
+            max_retries=_llm_max_retries(),
         )
 
     if os.getenv("ANTHROPIC_API_KEY"):
@@ -55,6 +67,8 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
         return ChatAnthropic(
             model=str(model or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")),
             temperature=temperature,
+            timeout=_llm_timeout_seconds(),
+            max_retries=_llm_max_retries(),
         )
 
     if os.getenv("MISTRAL_API_KEY"):
@@ -65,6 +79,8 @@ def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:
         return ChatMistralAI(
             model=str(model or os.getenv("LLM_MODEL", "mistral-large-latest")),  # type: ignore[call-arg]
             temperature=temperature,
+            timeout=int(_llm_timeout_seconds()),
+            max_retries=_llm_max_retries(),
         )
 
     raise RuntimeError(

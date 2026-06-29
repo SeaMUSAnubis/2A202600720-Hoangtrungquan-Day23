@@ -1,14 +1,14 @@
 # Agent Lab Report
 
-## 1. Tóm tắt
+## 1. Executive Summary
 
-Bài thực hành này triển khai một LangGraph support-ticket agent với tính năng định tuyến theo trạng thái (stateful routing), giả lập thực thi công cụ (mock tool execution), thử lại có giới hạn (bounded retry), mô phỏng vòng kiểm duyệt của con người (human-in-the-loop approval simulation), xử lý thư chết (dead-letter handling), xuất số liệu và tự động tạo báo cáo markdown.
+This lab implements a LangGraph support-ticket agent with stateful routing, mock tool execution, bounded retry, human-in-the-loop approval simulation, dead-letter handling, metrics export, and automated markdown report generation.
 
-Kết quả chạy hiện tại: **Tỷ lệ thành công 100.00%** trên **7 kịch bản**. Tất cả các kịch bản mẫu đều đã vượt qua.
+Current run result: **100.00% success rate** across **7 scenarios**. All sample scenarios passed.
 
-## 2. Tóm tắt Số liệu
+## 2. Metrics Summary
 
-| Số liệu | Giá trị |
+| Metric | Value |
 |---|---:|
 | Total scenarios | 7 |
 | Success rate | 100.00% |
@@ -17,7 +17,7 @@ Kết quả chạy hiện tại: **Tỷ lệ thành công 100.00%** trên **7 k�
 | Total approval steps | 2 |
 | Resume success | No |
 
-## 3. Kết quả theo từng Kịch bản
+## 3. Per-Scenario Results
 
 | Scenario | Success | Expected route | Actual route | Nodes visited | Retries | Approval observed | Errors |
 |---|---|---|---|---:|---:|---|---|
@@ -29,23 +29,23 @@ Kết quả chạy hiện tại: **Tỷ lệ thành công 100.00%** trên **7 k�
 | S06_delete | Yes | risky | risky | 8 | 0 | Yes | - |
 | S07_dead_letter | Yes | error | error | 5 | 1 | No | Attempt 1 failed, retrying... |
 
-## 4. Giải thích Kiến trúc
+## 4. Architecture Explanation
 
-Đồ thị (graph) bắt đầu với `intake`, sau đó gửi truy vấn đã chuẩn hóa tới `classify`. `classify_node` yêu cầu một LLM để phân loại tuyến đường có cấu trúc và chỉ chuyển sang dùng heuristic cơ bản (fallback) khi lệnh gọi LLM thất bại, điều này giúp luồng công việc vẫn có thể chạy được trong quá trình kiểm thử cục bộ hoặc khi gặp giới hạn tốc độ API (API rate limits).
+The graph starts with `intake`, then sends the normalized query to `classify`. `classify_node` asks an LLM for structured route classification and falls back to a small heuristic only when the LLM call fails, which keeps the workflow runnable during local testing or API rate limits.
 
-Sau khi phân loại, `route_after_classify` sẽ điều phối trạng thái tới một trong năm luồng:
+After classification, `route_after_classify` dispatches the state to one of five flows:
 
-- `simple`: trả lời trực tiếp bằng `answer_node`, sau đó đến `finalize`.
-- `tool`: gọi `tool_node`, đánh giá bằng `evaluate_node`, sau đó trả lời hoặc thử lại.
-- `missing_info`: gọi `ask_clarification_node` để tác tử (agent) yêu cầu thêm thông tin chi tiết thay vì bịa đặt thông tin (hallucinating).
-- `risky`: chuẩn bị một hành động đề xuất, đi qua `approval_node`, sau đó chỉ tiếp tục thực thi công cụ khi được phê duyệt.
-- `error`: đi vào nhánh thử lại (retry) trước tiên, sau đó thử lại việc thực thi công cụ hoặc đi đến `dead_letter`.
+- `simple`: answer directly with `answer_node`, then `finalize`.
+- `tool`: call `tool_node`, evaluate with `evaluate_node`, then either answer or retry.
+- `missing_info`: call `ask_clarification_node` so the agent asks for more details instead of hallucinating.
+- `risky`: prepare a proposed action, pass through `approval_node`, then continue to tool execution only when approved.
+- `error`: enter the retry path first, then either retry tool execution or go to `dead_letter`.
 
-`AgentState` dùng chung giúp luồng công việc có thể tuần tự hóa (serializable) và có thể kiểm tra được. Các trường chỉ thêm vào (append-only) như `messages`, `tool_results`, `errors`, và `events` lưu giữ lịch sử thực thi. Các trường ghi đè (overwrite) như `route`, `risk_level`, `attempt`, `evaluation_result`, `pending_question`, `proposed_action`, `approval`, và `final_answer` nắm bắt quyết định hoặc đầu ra mới nhất.
+The shared `AgentState` keeps the workflow serializable and inspectable. Append-only fields such as `messages`, `tool_results`, `errors`, and `events` preserve execution history. Overwrite fields such as `route`, `risk_level`, `attempt`, `evaluation_result`, `pending_question`, `proposed_action`, `approval`, and `final_answer` capture the latest decision or output.
 
-Mọi nhánh đầu cuối đều đi qua `finalize`, nút này tạo ra một sự kiện kiểm toán cuối cùng trước khi đồ thị đạt đến `END`.
+Every terminal path goes through `finalize`, which creates a final audit event before the graph reaches `END`.
 
-## 5. Hành vi của Tuyến
+## 5. Route Behavior
 
 | Route | Main path | Purpose |
 |---|---|---|
@@ -57,29 +57,29 @@ Mọi nhánh đầu cuối đều đi qua `finalize`, nút này tạo ra một s
 
 ## 6. Output Files
 
-- `outputs/metrics.json`: kết quả chạy ở định dạng máy có thể đọc được, dùng cho xác thực cục bộ và chấm điểm. Nó lưu các số liệu tóm tắt cùng với một bản ghi chi tiết cho mỗi kịch bản.
-- `reports/lab_report.md`: báo cáo định dạng con người có thể đọc được, được tạo từ `outputs/metrics.json`.
-- `data/sample/scenarios.jsonl`: các đầu vào mẫu được dùng để chạy thử toàn bộ các tuyến của đồ thị.
+- `outputs/metrics.json`: machine-readable run result used by local validation and grading. It stores summary metrics plus one detailed record per scenario.
+- `reports/lab_report.md`: human-readable report generated from `outputs/metrics.json`.
+- `data/sample/scenarios.jsonl`: sample inputs used to exercise all graph routes.
 
 ## 7. Failure Analysis
 
-1. **Lỗi API LLM hoặc giới hạn tốc độ**: `classify_node` và `answer_node` bắt các lỗi từ nhà cung cấp. Việc phân loại sẽ dự phòng (fallback) bằng các heuristic tất định, và việc trả lời sẽ trả về một thông báo dự phòng an toàn để đồ thị vẫn có thể kết thúc.
-2. **Lỗi công cụ tạm thời**: `tool_node` có thể trả về kết quả lỗi đối với các kịch bản `error`. `evaluate_node` đánh dấu trạng thái là `needs_retry`, và `retry_or_fallback_node` tăng `attempt`.
-3. **Rủi ro thử lại vô hạn**: `route_after_retry` so sánh `attempt` với `max_attempts`. Khi đạt đến giới hạn, đồ thị chuyển tuyến đến `dead_letter` thay vì lặp lại mãi mãi.
-4. **Tác động phụ rủi ro**: hoàn tiền, xóa, gửi email, và các hành động tương tự được định tuyến qua `risky_action_node` và `approval_node` trước khi thực thi công cụ.
-5. **Thiếu ngữ cảnh người dùng**: các yêu cầu mơ hồ được định tuyến tới `ask_clarification_node`, tránh việc đưa ra các giả định không được hỗ trợ.
+1. **LLM API failure or rate limit**: `classify_node` and `answer_node` catch provider errors. Classification falls back to deterministic heuristics, and answering returns a safe fallback message so the graph still terminates.
+2. **Transient tool failure**: `tool_node` can return an error result for `error` scenarios. `evaluate_node` marks that as `needs_retry`, and `retry_or_fallback_node` increments `attempt`.
+3. **Unbounded retry risk**: `route_after_retry` compares `attempt` with `max_attempts`. When the limit is reached, the graph routes to `dead_letter` instead of looping forever.
+4. **Risky side effects**: refund, delete, email, and similar actions route through `risky_action_node` and `approval_node` before tool execution.
+5. **Missing user context**: vague requests route to `ask_clarification_node`, avoiding unsupported assumptions.
 
-## 8. Những hạn chế hiện tại
+## 8. Current Limitations
 
-- `approval_node` hiện đang sử dụng mô phỏng phê duyệt (mock approval) để đảm bảo khả năng lặp lại trong CI/local; nó không tạm dừng cho một người đánh giá thực sự.
-- Việc lưu trữ trạng thái (persistence) hiện đang sử dụng bộ nhớ (memory checkpointer) từ `configs/lab.yaml`; lưu trữ bằng SQLite/Postgres được để dành như một phần mở rộng.
-- `evaluate_node` sử dụng một heuristic đơn giản thay vì dùng LLM-as-judge (LLM làm giám khảo).
-- Việc thực thi công cụ được mô phỏng (mocked), do đó không có hệ thống đặt hàng, hoàn tiền, email hay tài khoản thực sự nào được gọi.
+- `approval_node` currently uses mock approval for CI/local repeatability; it does not pause for a real reviewer.
+- Persistence currently uses the memory checkpointer from `configs/lab.yaml`; SQLite/Postgres checkpointing is left as an extension.
+- `evaluate_node` uses a simple heuristic instead of an LLM-as-judge.
+- Tool execution is mocked, so no real order, refund, email, or account system is called.
 
 ## 9. Improvement Plan
 
-- Thêm lưu trữ trạng thái (checkpointing) bằng SQLite và trình diễn lịch sử trạng thái hoặc khôi phục sự cố.
-- Thay thế mô phỏng phê duyệt bằng `interrupt()` của LangGraph cho một luồng đánh giá của người thật.
-- Thêm đánh giá bằng LLM-as-judge để kiểm tra chất lượng kết quả công cụ phong phú hơn.
-- Thêm đo độ trễ cho mỗi nút để `latency_ms` trở nên có ý nghĩa.
-- Mở rộng các kịch bản kiểu ẩn để kiểm tra mức độ ưu tiên của tuyến, các yêu cầu mơ hồ, và các trường hợp thử lại ở biên (edge cases).
+- Add SQLite checkpointing and demonstrate state history or crash resume.
+- Replace mock approval with LangGraph `interrupt()` for a real human review flow.
+- Add LLM-as-judge evaluation for richer tool-result quality checks.
+- Add latency measurement per node so `latency_ms` becomes meaningful.
+- Expand hidden-style scenarios to test route priority, ambiguous requests, and retry edge cases.
