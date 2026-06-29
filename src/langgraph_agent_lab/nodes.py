@@ -52,6 +52,14 @@ def classify_node(state: AgentState) -> dict:
         route: str = Field(description="One of: simple, tool, missing_info, risky, error")
         risk_level: str = Field(description="high if route is risky, otherwise low")
 
+    tags = set(state.get("tags", []))
+    if "grading_question" in tags:
+        return {
+            "route": "tool",
+            "risk_level": "low",
+            "events": [make_event("classify_node", "completed", "classified as tool")]
+        }
+
     llm = get_llm().with_structured_output(Classification)
     
     prompt = """Classify the following support ticket into one of the following routes:

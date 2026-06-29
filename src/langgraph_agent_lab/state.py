@@ -62,6 +62,7 @@ class AgentState(TypedDict, total=False):
     tool_results: Annotated[list[str], add]
     errors: Annotated[list[str], add]
     events: Annotated[list[dict[str, Any]], add]
+    tags: list[str]
 
 
 class Scenario(BaseModel):
@@ -96,6 +97,7 @@ def initial_state(scenario: Scenario) -> AgentState:
         "tool_results": [],
         "errors": [],
         "events": [],
+        "tags": scenario.tags,
     }
 
 
