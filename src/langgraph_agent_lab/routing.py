@@ -22,8 +22,15 @@ def route_after_classify(state: AgentState) -> str:
 
     Hint: use a dict mapping for clean implementation.
     """
-    raise NotImplementedError("TODO(student): implement route mapping after classify")
-
+    route = state.get("route", "")
+    mapping = {
+        "simple": "answer",
+        "tool": "tool",
+        "missing_info": "clarify",
+        "risky": "risky_action",
+        "error": "retry"
+    }
+    return mapping.get(route, "answer")
 
 def route_after_evaluate(state: AgentState) -> str:
     """Decide if tool result is satisfactory or needs retry.
@@ -34,8 +41,9 @@ def route_after_evaluate(state: AgentState) -> str:
     - If evaluation_result == "needs_retry" → "retry"
     - Otherwise → "answer"
     """
-    raise NotImplementedError("TODO(student): implement evaluate routing for retry loop")
-
+    if state.get("evaluation_result") == "needs_retry":
+        return "retry"
+    return "answer"
 
 def route_after_retry(state: AgentState) -> str:
     """Decide whether to retry the tool or give up.
@@ -45,8 +53,11 @@ def route_after_retry(state: AgentState) -> str:
     - If attempt < max_attempts → "tool" (try again)
     - If attempt >= max_attempts → "dead_letter" (give up, escalate)
     """
-    raise NotImplementedError("TODO(student): implement bounded retry routing")
-
+    attempt = state.get("attempt", 0)
+    max_attempts = state.get("max_attempts", 3)
+    if attempt < max_attempts:
+        return "tool"
+    return "dead_letter"
 
 def route_after_approval(state: AgentState) -> str:
     """Route based on human approval decision.
@@ -54,4 +65,7 @@ def route_after_approval(state: AgentState) -> str:
     - If approved → "tool" (proceed with risky action)
     - If rejected → "clarify" (ask user for alternative)
     """
-    raise NotImplementedError("TODO(student): implement approval routing")
+    approval = state.get("approval", {})
+    if approval.get("approved"):
+        return "tool"
+    return "clarify"

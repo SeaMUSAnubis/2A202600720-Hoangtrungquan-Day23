@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 import yaml
+from dotenv import load_dotenv
 
 from .graph import build_graph
 from .metrics import MetricsReport, metric_from_state, summarize_metrics, write_metrics
@@ -15,6 +16,8 @@ from .persistence import build_checkpointer
 from .report import write_report
 from .scenarios import load_scenarios
 from .state import initial_state
+
+load_dotenv()
 
 app = typer.Typer(no_args_is_help=True)
 

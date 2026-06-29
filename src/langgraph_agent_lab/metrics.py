@@ -40,8 +40,8 @@ def metric_from_state(state: dict[str, Any], expected_route: str, approval_requi
     actual_route = state.get("route")
     approval = state.get("approval")
     nodes = [event.get("node", "unknown") for event in events]
-    retry_count = sum(1 for node in nodes if node == "retry")
-    interrupt_count = sum(1 for node in nodes if node == "approval")
+    retry_count = sum(1 for node in nodes if node in {"retry", "retry_or_fallback_node"})
+    interrupt_count = sum(1 for node in nodes if node in {"approval", "approval_node"})
     success = actual_route == expected_route and bool(state.get("final_answer") or state.get("pending_question"))
     if approval_required:
         success = success and approval is not None

@@ -9,8 +9,12 @@ because classify_node and answer_node use real LLM calls.
 
 import importlib.util
 import os
+import time
 
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv()
 
 pytestmark = [
     pytest.mark.skipif(
@@ -18,8 +22,8 @@ pytestmark = [
         reason="langgraph not installed",
     ),
     pytest.mark.skipif(
-        not os.getenv("GEMINI_API_KEY") and not os.getenv("OPENAI_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"),
-        reason="No LLM API key configured (set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY)",
+        not os.getenv("GEMINI_API_KEY") and not os.getenv("OPENAI_API_KEY") and not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("MISTRAL_API_KEY"),
+        reason="No LLM API key configured",
     ),
 ]
 
@@ -38,7 +42,8 @@ from langgraph_agent_lab.state import Route, Scenario, initial_state
         ("Timeout failure while processing", Route.ERROR.value),
     ],
 )
-def test_graph_runs_and_routes_correctly(query, expected_route):
+def test_graph_runs_and_routes_correctly(query, expected_route) -> None:
+    time.sleep(0.1)  # Avoid LLM API rate limits (HTTP 429)
     graph = build_graph(checkpointer=build_checkpointer("memory"))
     scenario = Scenario(id="smoke", query=query, expected_route=Route(expected_route))
     state = initial_state(scenario)
@@ -47,7 +52,7 @@ def test_graph_runs_and_routes_correctly(query, expected_route):
     assert result.get("final_answer") or result.get("pending_question")
 
 
-def test_graph_terminates_all_routes():
+def test_graph_terminates_all_routes() -> None:
     """Verify every route reaches finalize node."""
     graph = build_graph(checkpointer=build_checkpointer("memory"))
     queries = [
@@ -58,6 +63,7 @@ def test_graph_terminates_all_routes():
         ("timeout error in system", Route.ERROR),
     ]
     for query, route in queries:
+        time.sleep(0.1)  # Avoid LLM API rate limits (HTTP 429)
         scenario = Scenario(id=f"term-{route.value}", query=query, expected_route=route)
         state = initial_state(scenario)
         result = graph.invoke(state, config={"configurable": {"thread_id": state["thread_id"]}})
